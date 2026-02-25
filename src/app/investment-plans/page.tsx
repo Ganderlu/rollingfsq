@@ -8,12 +8,11 @@ import {
   collection,
   doc,
   getDoc,
-  getFirestore,
   runTransaction,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import DashboardLayout from "@/components/dashboard-layout";
 import {
   CheckCircle,
@@ -64,7 +63,11 @@ const PLANS: InvestmentPlan[] = [
     maxAmount: 4999,
     roi: "10% Daily",
     duration: "14 Days",
-    features: ["Priority Support", "Advanced Analytics", "Compounding Available"],
+    features: [
+      "Priority Support",
+      "Advanced Analytics",
+      "Compounding Available",
+    ],
     color: "amber",
     icon: TrendingUp,
     popular: true,
@@ -98,7 +101,7 @@ export default function InvestmentPlansPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -127,21 +130,25 @@ export default function InvestmentPlansPage() {
   const handleInvest = async () => {
     if (!user || !selectedPlan || !profile) return;
     setError("");
-    
+
     const investAmount = parseFloat(amount);
-    
+
     if (isNaN(investAmount)) {
       setError("Please enter a valid amount.");
       return;
     }
 
     if (investAmount < selectedPlan.minAmount) {
-      setError(`Minimum investment for this plan is $${selectedPlan.minAmount}`);
+      setError(
+        `Minimum investment for this plan is $${selectedPlan.minAmount}`,
+      );
       return;
     }
 
     if (investAmount > selectedPlan.maxAmount) {
-      setError(`Maximum investment for this plan is $${selectedPlan.maxAmount}`);
+      setError(
+        `Maximum investment for this plan is $${selectedPlan.maxAmount}`,
+      );
       return;
     }
 
@@ -153,16 +160,16 @@ export default function InvestmentPlansPage() {
     setSubmitting(true);
 
     try {
-      const db = getFirestore();
-      
+      const db = getFirebaseFirestore();
+
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, "users", user.uid);
         const userSnapshot = await transaction.get(userRef);
-        
+
         if (!userSnapshot.exists()) {
           throw "User does not exist!";
         }
-        
+
         const currentBalance = userSnapshot.data().balance || 0;
         if (currentBalance < investAmount) {
           throw "Insufficient balance!";
@@ -171,7 +178,8 @@ export default function InvestmentPlansPage() {
         // Deduct balance
         transaction.update(userRef, {
           balance: currentBalance - investAmount,
-          activeDeposits: (userSnapshot.data().activeDeposits || 0) + investAmount,
+          activeDeposits:
+            (userSnapshot.data().activeDeposits || 0) + investAmount,
         });
 
         // Create investment record
@@ -190,15 +198,23 @@ export default function InvestmentPlansPage() {
       });
 
       // Update local state to reflect new balance immediately
-      setProfile((prev) => prev ? {
-        ...prev,
-        balance: (prev.balance || 0) - investAmount
-      } : null);
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              balance: (prev.balance || 0) - investAmount,
+            }
+          : null,
+      );
 
       setSuccess(true);
     } catch (err: any) {
       console.error("Investment error:", err);
-      setError(err === "Insufficient balance!" ? err : "Investment failed. Please try again.");
+      setError(
+        err === "Insufficient balance!"
+          ? err
+          : "Investment failed. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -219,7 +235,9 @@ export default function InvestmentPlansPage() {
       <div className="mx-auto max-w-7xl p-6 lg:p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">Investment Plans</h1>
+            <h1 className="text-2xl font-bold text-slate-50">
+              Investment Plans
+            </h1>
             <p className="mt-2 text-slate-400">
               Choose a plan that suits your financial goals.
             </p>
@@ -227,7 +245,10 @@ export default function InvestmentPlansPage() {
           <div className="text-right">
             <p className="text-sm font-medium text-slate-400">Your Balance</p>
             <p className="text-2xl font-bold text-emerald-400">
-              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(profile?.balance || 0)}
+              {new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+              }).format(profile?.balance || 0)}
             </p>
           </div>
         </div>
@@ -249,21 +270,31 @@ export default function InvestmentPlansPage() {
                 </div>
               )}
 
-              <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl ${
-                plan.color === "emerald" ? "bg-emerald-500/10 text-emerald-400" :
-                plan.color === "amber" ? "bg-amber-500/10 text-amber-400" :
-                "bg-violet-500/10 text-violet-400"
-              }`}>
+              <div
+                className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl ${
+                  plan.color === "emerald"
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : plan.color === "amber"
+                      ? "bg-amber-500/10 text-amber-400"
+                      : "bg-violet-500/10 text-violet-400"
+                }`}
+              >
                 <plan.icon className="h-7 w-7" />
               </div>
 
               <h3 className="text-xl font-bold text-slate-50">{plan.name}</h3>
               <div className="mt-4 flex items-baseline gap-1">
-                <span className={`text-4xl font-bold ${
-                  plan.color === "emerald" ? "text-emerald-400" :
-                  plan.color === "amber" ? "text-amber-400" :
-                  "text-violet-400"
-                }`}>{plan.roi}</span>
+                <span
+                  className={`text-4xl font-bold ${
+                    plan.color === "emerald"
+                      ? "text-emerald-400"
+                      : plan.color === "amber"
+                        ? "text-amber-400"
+                        : "text-violet-400"
+                  }`}
+                >
+                  {plan.roi}
+                </span>
               </div>
               <p className="text-sm text-slate-400">For {plan.duration}</p>
 
@@ -271,29 +302,44 @@ export default function InvestmentPlansPage() {
 
               <ul className="mb-8 flex-1 space-y-4">
                 {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-slate-300">
-                    <CheckCircle className={`h-5 w-5 ${
-                      plan.color === "emerald" ? "text-emerald-500" :
-                      plan.color === "amber" ? "text-amber-500" :
-                      "text-violet-500"
-                    }`} />
+                  <li
+                    key={i}
+                    className="flex items-center gap-3 text-sm text-slate-300"
+                  >
+                    <CheckCircle
+                      className={`h-5 w-5 ${
+                        plan.color === "emerald"
+                          ? "text-emerald-500"
+                          : plan.color === "amber"
+                            ? "text-amber-500"
+                            : "text-violet-500"
+                      }`}
+                    />
                     {feature}
                   </li>
                 ))}
                 <li className="flex items-center gap-3 text-sm text-slate-300">
-                  <CheckCircle className={`h-5 w-5 ${
-                    plan.color === "emerald" ? "text-emerald-500" :
-                    plan.color === "amber" ? "text-amber-500" :
-                    "text-violet-500"
-                  }`} />
+                  <CheckCircle
+                    className={`h-5 w-5 ${
+                      plan.color === "emerald"
+                        ? "text-emerald-500"
+                        : plan.color === "amber"
+                          ? "text-amber-500"
+                          : "text-violet-500"
+                    }`}
+                  />
                   Min: ${plan.minAmount}
                 </li>
                 <li className="flex items-center gap-3 text-sm text-slate-300">
-                  <CheckCircle className={`h-5 w-5 ${
-                    plan.color === "emerald" ? "text-emerald-500" :
-                    plan.color === "amber" ? "text-amber-500" :
-                    "text-violet-500"
-                  }`} />
+                  <CheckCircle
+                    className={`h-5 w-5 ${
+                      plan.color === "emerald"
+                        ? "text-emerald-500"
+                        : plan.color === "amber"
+                          ? "text-amber-500"
+                          : "text-violet-500"
+                    }`}
+                  />
                   Max: ${plan.maxAmount}
                 </li>
               </ul>
@@ -301,9 +347,11 @@ export default function InvestmentPlansPage() {
               <button
                 onClick={() => handleSelectPlan(plan)}
                 className={`w-full rounded-xl py-3 text-sm font-bold text-white transition-colors ${
-                  plan.color === "emerald" ? "bg-emerald-600 hover:bg-emerald-500" :
-                  plan.color === "amber" ? "bg-amber-600 hover:bg-amber-500" :
-                  "bg-violet-600 hover:bg-violet-500"
+                  plan.color === "emerald"
+                    ? "bg-emerald-600 hover:bg-emerald-500"
+                    : plan.color === "amber"
+                      ? "bg-amber-600 hover:bg-amber-500"
+                      : "bg-violet-600 hover:bg-violet-500"
                 }`}
               >
                 Choose Plan
@@ -320,9 +368,15 @@ export default function InvestmentPlansPage() {
                 <>
                   <div className="mb-6 flex items-start justify-between">
                     <div>
-                      <h3 className="text-xl font-bold text-slate-50">Invest in {selectedPlan.name}</h3>
+                      <h3 className="text-xl font-bold text-slate-50">
+                        Invest in {selectedPlan.name}
+                      </h3>
                       <p className="text-sm text-slate-400">
-                        Daily ROI: <span className="text-emerald-400">{selectedPlan.roi}</span> • Duration: {selectedPlan.duration}
+                        Daily ROI:{" "}
+                        <span className="text-emerald-400">
+                          {selectedPlan.roi}
+                        </span>{" "}
+                        • Duration: {selectedPlan.duration}
                       </p>
                     </div>
                     <button
@@ -362,8 +416,8 @@ export default function InvestmentPlansPage() {
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-400">Total Return</span>
                         <span className="font-semibold text-emerald-400">
-                          {amount && !isNaN(parseFloat(amount)) 
-                            ? `${parseFloat(selectedPlan.roi) * parseInt(selectedPlan.duration.split(' ')[0])}%`
+                          {amount && !isNaN(parseFloat(amount))
+                            ? `${parseFloat(selectedPlan.roi) * parseInt(selectedPlan.duration.split(" ")[0])}%`
                             : "0%"}
                         </span>
                       </div>
@@ -393,9 +447,13 @@ export default function InvestmentPlansPage() {
                       <CheckCircle className="h-12 w-12 text-emerald-400" />
                     </div>
                   </div>
-                  <h3 className="mb-2 text-2xl font-bold text-slate-50">Investment Active!</h3>
+                  <h3 className="mb-2 text-2xl font-bold text-slate-50">
+                    Investment Active!
+                  </h3>
                   <p className="mb-6 text-slate-400">
-                    You have successfully invested <strong>${parseFloat(amount).toFixed(2)}</strong> in the {selectedPlan.name}.
+                    You have successfully invested{" "}
+                    <strong>${parseFloat(amount).toFixed(2)}</strong> in the{" "}
+                    {selectedPlan.name}.
                   </p>
                   <button
                     onClick={() => {

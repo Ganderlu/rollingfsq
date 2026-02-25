@@ -8,11 +8,10 @@ import {
   collection,
   doc,
   getDoc,
-  getFirestore,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import DashboardLayout from "@/components/dashboard-layout";
 import {
   Wallet,
@@ -40,7 +39,9 @@ export default function WithdrawPage() {
 
   // Form State
   const [amount, setAmount] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState<"BTC" | "ETH" | "USDT" | "BANK">("BTC");
+  const [selectedMethod, setSelectedMethod] = useState<
+    "BTC" | "ETH" | "USDT" | "BANK"
+  >("BTC");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [bankDetails, setBankDetails] = useState({
     bankName: "",
@@ -54,7 +55,7 @@ export default function WithdrawPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -75,14 +76,19 @@ export default function WithdrawPage() {
 
   const handleNextStep = () => {
     setError("");
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError("Please enter a valid withdrawal amount.");
       return;
     }
 
-    if (profile?.balance !== undefined && parseFloat(amount) > profile.balance) {
-      setError("Insufficient funds. Please enter an amount within your available balance.");
+    if (
+      profile?.balance !== undefined &&
+      parseFloat(amount) > profile.balance
+    ) {
+      setError(
+        "Insufficient funds. Please enter an amount within your available balance.",
+      );
       return;
     }
 
@@ -95,7 +101,11 @@ export default function WithdrawPage() {
 
     // Validation
     if (selectedMethod === "BANK") {
-      if (!bankDetails.bankName || !bankDetails.accountNumber || !bankDetails.accountName) {
+      if (
+        !bankDetails.bankName ||
+        !bankDetails.accountNumber ||
+        !bankDetails.accountName
+      ) {
         setError("Please fill in all required bank details.");
         return;
       }
@@ -109,8 +119,8 @@ export default function WithdrawPage() {
     setSubmitting(true);
 
     try {
-      const db = getFirestore();
-      
+      const db = getFirebaseFirestore();
+
       const withdrawalData = {
         userId: user.uid,
         userEmail: user.email,
@@ -119,7 +129,10 @@ export default function WithdrawPage() {
         status: "pending",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        details: selectedMethod === "BANK" ? bankDetails : { walletAddress: destinationAddress },
+        details:
+          selectedMethod === "BANK"
+            ? bankDetails
+            : { walletAddress: destinationAddress },
       };
 
       // Create withdrawal record
@@ -128,7 +141,7 @@ export default function WithdrawPage() {
       // In a real app, you might deduct the balance immediately or mark it as "frozen"
       // via a Cloud Function or backend API to prevent double-spending.
       // For this frontend-only demo, we just record the request.
-      
+
       setStep(3);
     } catch (err) {
       console.error("Error creating withdrawal:", err);
@@ -152,7 +165,9 @@ export default function WithdrawPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-4xl p-6 lg:p-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-50">Request Withdrawal</h1>
+          <h1 className="text-2xl font-bold text-slate-50">
+            Request Withdrawal
+          </h1>
           <p className="mt-2 text-slate-400">
             Withdraw your funds securely to your wallet or bank account.
           </p>
@@ -172,12 +187,16 @@ export default function WithdrawPage() {
               >
                 1
               </div>
-              <span className={`text-xs ${step >= 1 ? "text-emerald-400" : "text-slate-600"}`}>
+              <span
+                className={`text-xs ${step >= 1 ? "text-emerald-400" : "text-slate-600"}`}
+              >
                 Amount
               </span>
             </div>
-            <div className={`h-0.5 flex-1 transition-colors ${step >= 2 ? "bg-emerald-500" : "bg-slate-800"}`} />
-            
+            <div
+              className={`h-0.5 flex-1 transition-colors ${step >= 2 ? "bg-emerald-500" : "bg-slate-800"}`}
+            />
+
             {/* Step 2 */}
             <div className="flex flex-col items-center gap-2">
               <div
@@ -189,11 +208,15 @@ export default function WithdrawPage() {
               >
                 2
               </div>
-              <span className={`text-xs ${step >= 2 ? "text-emerald-400" : "text-slate-600"}`}>
+              <span
+                className={`text-xs ${step >= 2 ? "text-emerald-400" : "text-slate-600"}`}
+              >
                 Details
               </span>
             </div>
-            <div className={`h-0.5 flex-1 transition-colors ${step >= 3 ? "bg-emerald-500" : "bg-slate-800"}`} />
+            <div
+              className={`h-0.5 flex-1 transition-colors ${step >= 3 ? "bg-emerald-500" : "bg-slate-800"}`}
+            />
 
             {/* Step 3 */}
             <div className="flex flex-col items-center gap-2">
@@ -206,7 +229,9 @@ export default function WithdrawPage() {
               >
                 3
               </div>
-              <span className={`text-xs ${step >= 3 ? "text-emerald-400" : "text-slate-600"}`}>
+              <span
+                className={`text-xs ${step >= 3 ? "text-emerald-400" : "text-slate-600"}`}
+              >
                 Confirm
               </span>
             </div>
@@ -220,12 +245,17 @@ export default function WithdrawPage() {
               {/* Available Balance Display */}
               <div className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-950 p-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-400">Available Balance</p>
+                  <p className="text-sm font-medium text-slate-400">
+                    Available Balance
+                  </p>
                   <p className="text-2xl font-bold text-slate-50">
-                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(profile?.balance || 0)}
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(profile?.balance || 0)}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setAmount((profile?.balance || 0).toString())}
                   className="text-sm font-semibold text-emerald-400 hover:text-emerald-300"
                 >
@@ -301,52 +331,82 @@ export default function WithdrawPage() {
                 <div className="flex gap-3">
                   <AlertCircle className="h-5 w-5 flex-shrink-0" />
                   <p className="text-sm">
-                    Please ensure your details are correct. 
-                    Withdrawals to incorrect addresses cannot be reversed.
+                    Please ensure your details are correct. Withdrawals to
+                    incorrect addresses cannot be reversed.
                   </p>
                 </div>
               </div>
 
               <div>
                 <h3 className="mb-4 text-lg font-semibold text-slate-50">
-                  {selectedMethod === "BANK" ? "Bank Account Details" : "Wallet Address"}
+                  {selectedMethod === "BANK"
+                    ? "Bank Account Details"
+                    : "Wallet Address"}
                 </h3>
 
                 {selectedMethod === "BANK" ? (
                   <div className="space-y-4">
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-400">Bank Name</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-400">
+                        Bank Name
+                      </label>
                       <input
                         type="text"
                         value={bankDetails.bankName}
-                        onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                        onChange={(e) =>
+                          setBankDetails({
+                            ...bankDetails,
+                            bankName: e.target.value,
+                          })
+                        }
                         className="block w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-50 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-400">Account Holder Name</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-400">
+                        Account Holder Name
+                      </label>
                       <input
                         type="text"
                         value={bankDetails.accountName}
-                        onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
+                        onChange={(e) =>
+                          setBankDetails({
+                            ...bankDetails,
+                            accountName: e.target.value,
+                          })
+                        }
                         className="block w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-50 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-400">Account Number / IBAN</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-400">
+                        Account Number / IBAN
+                      </label>
                       <input
                         type="text"
                         value={bankDetails.accountNumber}
-                        onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
+                        onChange={(e) =>
+                          setBankDetails({
+                            ...bankDetails,
+                            accountNumber: e.target.value,
+                          })
+                        }
                         className="block w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-50 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-400">Routing / Swift Code (Optional)</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-400">
+                        Routing / Swift Code (Optional)
+                      </label>
                       <input
                         type="text"
                         value={bankDetails.routingNumber}
-                        onChange={(e) => setBankDetails({ ...bankDetails, routingNumber: e.target.value })}
+                        onChange={(e) =>
+                          setBankDetails({
+                            ...bankDetails,
+                            routingNumber: e.target.value,
+                          })
+                        }
                         className="block w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-slate-50 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
@@ -365,7 +425,7 @@ export default function WithdrawPage() {
                     />
                   </div>
                 )}
-                
+
                 {error && (
                   <p className="mt-4 flex items-center gap-2 text-sm text-red-400">
                     <AlertCircle className="h-4 w-4" />
@@ -398,14 +458,18 @@ export default function WithdrawPage() {
               <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 ring-8 ring-emerald-500/10">
                 <CheckCircle className="h-12 w-12" />
               </div>
-              <h2 className="text-3xl font-bold text-white">Withdrawal Requested!</h2>
+              <h2 className="text-3xl font-bold text-white">
+                Withdrawal Requested!
+              </h2>
               <p className="mt-4 max-w-md text-slate-400">
-                Your withdrawal request for <strong>${parseFloat(amount).toFixed(2)}</strong> via{" "}
+                Your withdrawal request for{" "}
+                <strong>${parseFloat(amount).toFixed(2)}</strong> via{" "}
                 <strong>{selectedMethod}</strong> has been submitted.
-                <br className="my-2"/>
-                Our team will process your request shortly. You can track the status in your dashboard.
+                <br className="my-2" />
+                Our team will process your request shortly. You can track the
+                status in your dashboard.
               </p>
-              
+
               <div className="mt-8 flex gap-4">
                 <button
                   onClick={() => router.push("/dashboard")}
@@ -418,7 +482,12 @@ export default function WithdrawPage() {
                     setStep(1);
                     setAmount("");
                     setDestinationAddress("");
-                    setBankDetails({ bankName: "", accountName: "", accountNumber: "", routingNumber: "" });
+                    setBankDetails({
+                      bankName: "",
+                      accountName: "",
+                      accountNumber: "",
+                      routingNumber: "",
+                    });
                   }}
                   className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
                 >

@@ -3,14 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import {
-  collection,
-  getDocs,
-  getFirestore,
-  query,
-  where,
-} from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import AdminLayout from "@/components/admin-layout";
 import {
   Users,
@@ -37,7 +31,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -64,7 +58,9 @@ export default function AdminDashboardPage() {
         });
 
         // Fetch Withdrawals
-        const withdrawalsSnapshot = await getDocs(collection(db, "withdrawals"));
+        const withdrawalsSnapshot = await getDocs(
+          collection(db, "withdrawals"),
+        );
         let totalWithdrawals = 0;
         let pendingWithdrawals = 0;
         withdrawalsSnapshot.forEach((doc) => {
@@ -77,7 +73,9 @@ export default function AdminDashboardPage() {
         });
 
         // Fetch Investments
-        const investmentsSnapshot = await getDocs(collection(db, "investments"));
+        const investmentsSnapshot = await getDocs(
+          collection(db, "investments"),
+        );
         let activeInvestments = 0;
         investmentsSnapshot.forEach((doc) => {
           const data = doc.data();
@@ -137,7 +135,9 @@ export default function AdminDashboardPage() {
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-400">Total Users</p>
+                <p className="text-sm font-medium text-slate-400">
+                  Total Users
+                </p>
                 <h3 className="mt-2 text-3xl font-bold text-slate-50">
                   {stats.totalUsers}
                 </h3>
@@ -151,7 +151,9 @@ export default function AdminDashboardPage() {
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-400">Total Deposits</p>
+                <p className="text-sm font-medium text-slate-400">
+                  Total Deposits
+                </p>
                 <h3 className="mt-2 text-3xl font-bold text-emerald-400">
                   {formatCurrency(stats.totalDeposits)}
                 </h3>
@@ -165,7 +167,9 @@ export default function AdminDashboardPage() {
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-400">Total Withdrawals</p>
+                <p className="text-sm font-medium text-slate-400">
+                  Total Withdrawals
+                </p>
                 <h3 className="mt-2 text-3xl font-bold text-slate-50">
                   {formatCurrency(stats.totalWithdrawals)}
                 </h3>
@@ -179,7 +183,9 @@ export default function AdminDashboardPage() {
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-400">Active Investments</p>
+                <p className="text-sm font-medium text-slate-400">
+                  Active Investments
+                </p>
                 <h3 className="mt-2 text-3xl font-bold text-violet-400">
                   {stats.activeInvestments}
                 </h3>
@@ -195,7 +201,9 @@ export default function AdminDashboardPage() {
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-50">Pending Actions</h3>
+              <h3 className="text-lg font-bold text-slate-50">
+                Pending Actions
+              </h3>
               <Activity className="h-5 w-5 text-slate-400" />
             </div>
             <div className="space-y-4">
@@ -205,13 +213,17 @@ export default function AdminDashboardPage() {
                     <DollarSign className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-200">Pending Deposits</p>
+                    <p className="font-medium text-slate-200">
+                      Pending Deposits
+                    </p>
                     <p className="text-xs text-slate-500">Requires approval</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-xl font-bold text-slate-50">{stats.pendingDeposits}</span>
-                  <button 
+                  <span className="text-xl font-bold text-slate-50">
+                    {stats.pendingDeposits}
+                  </span>
+                  <button
                     onClick={() => router.push("/admin/deposits")}
                     className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition"
                   >
@@ -226,13 +238,19 @@ export default function AdminDashboardPage() {
                     <ArrowUpRight className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-200">Pending Withdrawals</p>
-                    <p className="text-xs text-slate-500">Requires processing</p>
+                    <p className="font-medium text-slate-200">
+                      Pending Withdrawals
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Requires processing
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-xl font-bold text-slate-50">{stats.pendingWithdrawals}</span>
-                  <button 
+                  <span className="text-xl font-bold text-slate-50">
+                    {stats.pendingWithdrawals}
+                  </span>
+                  <button
                     onClick={() => router.push("/admin/withdrawals")}
                     className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition"
                   >
@@ -244,25 +262,29 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="rounded-3xl border border-white/5 bg-slate-900 p-6 shadow-sm">
-             <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-50">Quick Links</h3>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => router.push("/admin/users")}
-                  className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/5 bg-slate-950 p-6 transition hover:bg-slate-800"
-                >
-                   <Users className="h-8 w-8 text-blue-500" />
-                   <span className="text-sm font-medium text-slate-300">Manage Users</span>
-                </button>
-                <button 
-                  onClick={() => router.push("/admin/investments")}
-                  className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/5 bg-slate-950 p-6 transition hover:bg-slate-800"
-                >
-                   <TrendingUp className="h-8 w-8 text-violet-500" />
-                   <span className="text-sm font-medium text-slate-300">Investments</span>
-                </button>
-             </div>
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-slate-50">Quick Links</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => router.push("/admin/users")}
+                className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/5 bg-slate-950 p-6 transition hover:bg-slate-800"
+              >
+                <Users className="h-8 w-8 text-blue-500" />
+                <span className="text-sm font-medium text-slate-300">
+                  Manage Users
+                </span>
+              </button>
+              <button
+                onClick={() => router.push("/admin/investments")}
+                className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/5 bg-slate-950 p-6 transition hover:bg-slate-800"
+              >
+                <TrendingUp className="h-8 w-8 text-violet-500" />
+                <span className="text-sm font-medium text-slate-300">
+                  Investments
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

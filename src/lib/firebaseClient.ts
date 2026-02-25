@@ -25,6 +25,24 @@ export function getFirebaseApp() {
   return initFirebaseApp();
 }
 
+import { getStorage } from "firebase/storage";
+import { getFirestore, type Firestore } from "firebase/firestore";
+
+export function getFirebaseStorage() {
+  const app = initFirebaseApp();
+  return getStorage(app);
+}
+
+let firestore: Firestore | undefined;
+
+export function getFirebaseFirestore() {
+  const app = initFirebaseApp();
+  if (!firestore) {
+    firestore = getFirestore(app);
+  }
+  return firestore;
+}
+
 export function getFirebaseAnalytics() {
   if (typeof window === "undefined") {
     return undefined;
@@ -35,4 +53,3 @@ export function getFirebaseAnalytics() {
   }
   return analytics;
 }
-

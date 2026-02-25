@@ -9,11 +9,10 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  getFirestore,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import DashboardLayout from "@/components/dashboard-layout";
 import {
   Wallet,
@@ -63,7 +62,7 @@ export default function DepositPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const fetchSettings = () => {
       try {

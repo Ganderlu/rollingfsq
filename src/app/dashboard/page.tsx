@@ -3,8 +3,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, getFirestore, Timestamp } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import {
+  doc,
+  getDoc,
+  Timestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
+  orderBy,
+} from "firebase/firestore";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import DashboardLayout from "@/components/dashboard-layout";
 import {
   History,
@@ -13,6 +23,8 @@ import {
   Box,
   ArrowUpRight,
   ArrowDownLeft,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 
 type UserProfile = {
@@ -32,15 +44,29 @@ type UserProfile = {
   lastWithdrawal?: number;
 };
 
+type Transaction = {
+  id: string;
+  type: "deposit" | "withdrawal" | "investment";
+  amount: number;
+  currency?: string;
+  planName?: string;
+  status: string;
+  createdAt: Timestamp;
+  method?: string;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
+    [],
+  );
 
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -48,6 +74,7 @@ export default function DashboardPage() {
         return;
       }
 
+      // Fetch Profile
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       if (userDoc.exists()) {
         setProfile(userDoc.data() as UserProfile);
@@ -57,6 +84,62 @@ export default function DashboardPage() {
           joinedDate: new Date(), // Fallback
         });
       }
+
+      // Fetch Recent Transactions
+      try {
+        const depositsQuery = query(
+          collection(db, "deposits"),
+          where("userId", "==", currentUser.uid),
+          orderBy("createdAt", "desc"),
+          limit(5),
+        );
+        const withdrawalsQuery = query(
+          collection(db, "withdrawals"),
+          where("userId", "==", currentUser.uid),
+          orderBy("createdAt", "desc"),
+          limit(5),
+        );
+        const investmentsQuery = query(
+          collection(db, "investments"),
+          where("userId", "==", currentUser.uid),
+          orderBy("createdAt", "desc"),
+          limit(5),
+        );
+
+        const [depositsSnap, withdrawalsSnap, investmentsSnap] =
+          await Promise.all([
+            getDocs(depositsQuery),
+            getDocs(withdrawalsQuery),
+            getDocs(investmentsQuery),
+          ]);
+
+        const deposits = depositsSnap.docs.map((doc) => ({
+          id: doc.id,
+          type: "deposit" as const,
+          ...doc.data(),
+        })) as Transaction[];
+
+        const withdrawals = withdrawalsSnap.docs.map((doc) => ({
+          id: doc.id,
+          type: "withdrawal" as const,
+          ...doc.data(),
+        })) as Transaction[];
+
+        const investments = investmentsSnap.docs.map((doc) => ({
+          id: doc.id,
+          type: "investment" as const,
+          ...doc.data(),
+        })) as Transaction[];
+
+        const all = [...deposits, ...withdrawals, ...investments]
+          .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
+          .slice(0, 10);
+
+        setRecentTransactions(all);
+      } catch (error) {
+        console.error("Error fetching transactions:", error);
+      }
+
       setCheckingAuth(false);
     });
 
@@ -307,6 +390,96 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Recent Account History */}
+        <div className="mt-8 rounded-3xl border border-white/5 bg-slate-900 p-6 lg:p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
+              <h3 className="text-lg font-bold text-slate-50">
+                Recent Account History
+              </h3>
+            </div>
+            <button
+              onClick={() => router.push("/account-history")}
+              className="text-xs font-medium text-emerald-500 hover:text-emerald-400"
+            >
+              View All
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {recentTransactions.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-500">
+                No recent transactions found
+              </div>
+            ) : (
+              recentTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between rounded-xl bg-slate-950/50 p-4 transition-colors hover:bg-slate-950"
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                        tx.type === "deposit"
+                          ? "bg-emerald-500/10 text-emerald-500"
+                          : tx.type === "withdrawal"
+                            ? "bg-amber-500/10 text-amber-500"
+                            : "bg-blue-500/10 text-blue-500"
+                      }`}
+                    >
+                      {tx.type === "deposit" ? (
+                        <ArrowDownLeft className="h-5 w-5" />
+                      ) : tx.type === "withdrawal" ? (
+                        <ArrowUpRight className="h-5 w-5" />
+                      ) : (
+                        <TrendingUp className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-50 capitalize">
+                        {tx.type}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDate(tx.createdAt)}</span>
+                        {tx.status && (
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] capitalize ${
+                              tx.status === "approved" ||
+                              tx.status === "completed"
+                                ? "bg-emerald-500/10 text-emerald-500"
+                                : tx.status === "pending"
+                                  ? "bg-amber-500/10 text-amber-500"
+                                  : "bg-red-500/10 text-red-500"
+                            }`}
+                          >
+                            {tx.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={`font-bold ${
+                        tx.type === "deposit"
+                          ? "text-emerald-500"
+                          : "text-slate-50"
+                      }`}
+                    >
+                      {tx.type === "deposit" ? "+" : "-"}
+                      {formatCurrency(tx.amount)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {tx.method || "Wallet"}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

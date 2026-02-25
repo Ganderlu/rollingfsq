@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, getFirestore } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { doc, getDoc } from "firebase/firestore";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -76,7 +76,7 @@ export default function AdminLayout({
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {

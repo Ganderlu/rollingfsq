@@ -6,7 +6,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   getDocs,
-  getFirestore,
   query,
   orderBy,
   Timestamp,
@@ -17,7 +16,7 @@ import {
   getDoc,
   increment,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import AdminLayout from "@/components/admin-layout";
 import {
   CreditCard,
@@ -51,7 +50,7 @@ export default function AdminDepositsPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -62,16 +61,16 @@ export default function AdminDepositsPage() {
       try {
         const depositsQuery = query(
           collection(db, "deposits"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
         const snapshot = await getDocs(depositsQuery);
-        
+
         // Fetch user emails for each deposit
         const depositsData = await Promise.all(
           snapshot.docs.map(async (depositDoc) => {
             const data = depositDoc.data();
             let userEmail = "Unknown";
-            
+
             try {
               if (data.userId) {
                 const userDoc = await getDoc(doc(db, "users", data.userId));
@@ -88,7 +87,7 @@ export default function AdminDepositsPage() {
               ...data,
               userEmail,
             } as DepositRequest;
-          })
+          }),
         );
 
         setDeposits(depositsData);
@@ -102,12 +101,15 @@ export default function AdminDepositsPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleStatusUpdate = async (deposit: DepositRequest, newStatus: "approved" | "rejected") => {
+  const handleStatusUpdate = async (
+    deposit: DepositRequest,
+    newStatus: "approved" | "rejected",
+  ) => {
     if (processingId) return;
     if (!confirm(`Are you sure you want to ${newStatus} this deposit?`)) return;
 
     setProcessingId(deposit.id);
-    const db = getFirestore(getFirebaseApp());
+    const db = getFirebaseFirestore();
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -123,23 +125,54 @@ export default function AdminDepositsPage() {
           throw "Deposit is already processed!";
         }
 
-        transaction.update(depositRef, { 
+        const userDocSnapshot = await transaction.get(userRef);
+        if (!userDocSnapshot.exists()) {
+          throw "User document does not exist!";
+        }
+
+        const userData = userDocSnapshot.data();
+        let referrerRef = null;
+        let referrerDoc = null;
+
+        // Prepare referrer update if applicable (Reads must be before Writes)
+        if (
+          newStatus === "approved" &&
+          (userData.totalInvested || 0) === 0 &&
+          userData.referredBy
+        ) {
+          referrerRef = doc(db, "users", userData.referredBy);
+          referrerDoc = await transaction.get(referrerRef);
+        }
+
+        transaction.update(depositRef, {
           status: newStatus,
-          processedAt: Timestamp.now()
+          processedAt: Timestamp.now(),
         });
 
         if (newStatus === "approved") {
           transaction.update(userRef, {
-            balance: increment(deposit.amount)
+            balance: increment(deposit.amount),
+            totalInvested: increment(deposit.amount),
+            activeDeposits: increment(1),
           });
+
+          // Apply Referral Bonus
+          if (referrerDoc && referrerDoc.exists() && referrerRef) {
+            const bonus = deposit.amount * 0.1; // 10% bonus
+            transaction.update(referrerRef, {
+              balance: increment(bonus),
+              referralEarnings: increment(bonus),
+            });
+          }
         }
       });
 
       // Update local state
-      setDeposits(deposits.map(d => 
-        d.id === deposit.id ? { ...d, status: newStatus } : d
-      ));
-
+      setDeposits(
+        deposits.map((d) =>
+          d.id === deposit.id ? { ...d, status: newStatus } : d,
+        ),
+      );
     } catch (error) {
       console.error("Error updating deposit:", error);
       alert("Failed to update deposit status: " + error);
@@ -148,7 +181,7 @@ export default function AdminDepositsPage() {
     }
   };
 
-  const filteredDeposits = deposits.filter(deposit => {
+  const filteredDeposits = deposits.filter((deposit) => {
     if (filterStatus === "all") return true;
     return deposit.status === filterStatus;
   });
@@ -176,7 +209,9 @@ export default function AdminDepositsPage() {
     return (
       <AdminLayout>
         <div className="flex h-full items-center justify-center">
-          <div className="animate-pulse text-slate-400">Loading deposits...</div>
+          <div className="animate-pulse text-slate-400">
+            Loading deposits...
+          </div>
         </div>
       </AdminLayout>
     );
@@ -187,12 +222,14 @@ export default function AdminDepositsPage() {
       <div className="mx-auto max-w-7xl p-6 lg:p-8">
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">Deposit Requests</h1>
+            <h1 className="text-2xl font-bold text-slate-50">
+              Deposit Requests
+            </h1>
             <p className="mt-2 text-slate-400">
               Manage and approve user deposits.
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-500" />
             <select
@@ -213,18 +250,33 @@ export default function AdminDepositsPage() {
             <table className="w-full text-left text-sm text-slate-400">
               <thead className="bg-slate-950/50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th scope="col" className="px-6 py-4 font-medium">User</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Amount</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Method</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Date</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                  <th scope="col" className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    User
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Amount
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Method
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Date
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredDeposits.length > 0 ? (
                   filteredDeposits.map((deposit) => (
-                    <tr key={deposit.id} className="hover:bg-white/5 transition-colors">
+                    <tr
+                      key={deposit.id}
+                      className="hover:bg-white/5 transition-colors"
+                    >
                       <td className="whitespace-nowrap px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-400">
@@ -234,7 +286,9 @@ export default function AdminDepositsPage() {
                             <p className="font-medium text-slate-200">
                               {deposit.userEmail}
                             </p>
-                            <p className="text-xs text-slate-500">ID: {deposit.id.slice(0, 8)}</p>
+                            <p className="text-xs text-slate-500">
+                              ID: {deposit.id.slice(0, 8)}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -248,32 +302,44 @@ export default function AdminDepositsPage() {
                         {formatDate(deposit.createdAt)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                          deposit.status === "approved"
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : deposit.status === "rejected"
-                            ? "bg-red-500/10 text-red-400"
-                            : "bg-amber-500/10 text-amber-400"
-                        }`}>
-                          {deposit.status === "pending" && <Clock className="h-3 w-3" />}
-                          {deposit.status === "approved" && <CheckCircle className="h-3 w-3" />}
-                          {deposit.status === "rejected" && <XCircle className="h-3 w-3" />}
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                            deposit.status === "approved"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : deposit.status === "rejected"
+                                ? "bg-red-500/10 text-red-400"
+                                : "bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {deposit.status === "pending" && (
+                            <Clock className="h-3 w-3" />
+                          )}
+                          {deposit.status === "approved" && (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          {deposit.status === "rejected" && (
+                            <XCircle className="h-3 w-3" />
+                          )}
                           {deposit.status}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
                         {deposit.status === "pending" && (
                           <div className="flex justify-end gap-2">
-                            <button 
-                              onClick={() => handleStatusUpdate(deposit, "approved")}
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(deposit, "approved")
+                              }
                               disabled={!!processingId}
                               className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 transition hover:bg-emerald-500/20 disabled:opacity-50"
                               title="Approve Deposit"
                             >
                               <CheckCircle className="h-4 w-4" />
                             </button>
-                            <button 
-                              onClick={() => handleStatusUpdate(deposit, "rejected")}
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(deposit, "rejected")
+                              }
                               disabled={!!processingId}
                               className="rounded-lg bg-red-500/10 p-2 text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
                               title="Reject Deposit"
@@ -283,14 +349,19 @@ export default function AdminDepositsPage() {
                           </div>
                         )}
                         {deposit.status !== "pending" && (
-                          <span className="text-xs text-slate-600">Processed</span>
+                          <span className="text-xs text-slate-600">
+                            Processed
+                          </span>
                         )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    <td
+                      colSpan={6}
+                      className="px-6 py-12 text-center text-slate-500"
+                    >
                       No deposits found.
                     </td>
                   </tr>

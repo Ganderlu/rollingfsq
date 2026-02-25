@@ -6,7 +6,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   getDocs,
-  getFirestore,
   query,
   orderBy,
   Timestamp,
@@ -17,7 +16,7 @@ import {
   getDoc,
   increment,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import AdminLayout from "@/components/admin-layout";
 import {
   ArrowUpRight,
@@ -52,7 +51,7 @@ export default function AdminWithdrawalsPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -63,15 +62,15 @@ export default function AdminWithdrawalsPage() {
       try {
         const withdrawalsQuery = query(
           collection(db, "withdrawals"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
         const snapshot = await getDocs(withdrawalsQuery);
-        
+
         const withdrawalsData = await Promise.all(
           snapshot.docs.map(async (wdDoc) => {
             const data = wdDoc.data();
             let userEmail = data.userEmail || "Unknown";
-            
+
             // If email is missing in withdrawal doc, try to fetch from user doc
             if (!data.userEmail && data.userId) {
               try {
@@ -89,7 +88,7 @@ export default function AdminWithdrawalsPage() {
               ...data,
               userEmail,
             } as WithdrawalRequest;
-          })
+          }),
         );
 
         setWithdrawals(withdrawalsData);
@@ -103,14 +102,17 @@ export default function AdminWithdrawalsPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleStatusUpdate = async (withdrawal: WithdrawalRequest, newStatus: "approved" | "rejected") => {
+  const handleStatusUpdate = async (
+    withdrawal: WithdrawalRequest,
+    newStatus: "approved" | "rejected",
+  ) => {
     if (processingId) return;
-    
+
     const action = newStatus === "approved" ? "approve" : "reject";
     if (!confirm(`Are you sure you want to ${action} this withdrawal?`)) return;
 
     setProcessingId(withdrawal.id);
-    const db = getFirestore(getFirebaseApp());
+    const db = getFirebaseFirestore();
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -130,9 +132,9 @@ export default function AdminWithdrawalsPage() {
         if (newStatus === "approved") {
           const userDoc = await transaction.get(userRef);
           if (!userDoc.exists()) {
-             throw "User document does not exist!";
+            throw "User document does not exist!";
           }
-          
+
           const currentBalance = userDoc.data().balance || 0;
           if (currentBalance < withdrawal.amount) {
             throw `Insufficient user balance! Current: ${currentBalance}, Requested: ${withdrawal.amount}`;
@@ -140,22 +142,23 @@ export default function AdminWithdrawalsPage() {
 
           // Deduct balance
           transaction.update(userRef, {
-            balance: increment(-withdrawal.amount)
+            balance: increment(-withdrawal.amount),
           });
         }
 
         // Update withdrawal status
-        transaction.update(withdrawalRef, { 
+        transaction.update(withdrawalRef, {
           status: newStatus,
-          processedAt: Timestamp.now()
+          processedAt: Timestamp.now(),
         });
       });
 
       // Update local state
-      setWithdrawals(withdrawals.map(w => 
-        w.id === withdrawal.id ? { ...w, status: newStatus } : w
-      ));
-
+      setWithdrawals(
+        withdrawals.map((w) =>
+          w.id === withdrawal.id ? { ...w, status: newStatus } : w,
+        ),
+      );
     } catch (error) {
       console.error("Error updating withdrawal:", error);
       alert("Failed to update withdrawal status: " + error);
@@ -164,7 +167,7 @@ export default function AdminWithdrawalsPage() {
     }
   };
 
-  const filteredWithdrawals = withdrawals.filter(wd => {
+  const filteredWithdrawals = withdrawals.filter((wd) => {
     if (filterStatus === "all") return true;
     return wd.status === filterStatus;
   });
@@ -192,7 +195,9 @@ export default function AdminWithdrawalsPage() {
     return (
       <AdminLayout>
         <div className="flex h-full items-center justify-center">
-          <div className="animate-pulse text-slate-400">Loading withdrawals...</div>
+          <div className="animate-pulse text-slate-400">
+            Loading withdrawals...
+          </div>
         </div>
       </AdminLayout>
     );
@@ -203,12 +208,14 @@ export default function AdminWithdrawalsPage() {
       <div className="mx-auto max-w-7xl p-6 lg:p-8">
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">Withdrawal Requests</h1>
+            <h1 className="text-2xl font-bold text-slate-50">
+              Withdrawal Requests
+            </h1>
             <p className="mt-2 text-slate-400">
               Manage and process user withdrawals.
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-500" />
             <select
@@ -229,19 +236,36 @@ export default function AdminWithdrawalsPage() {
             <table className="w-full text-left text-sm text-slate-400">
               <thead className="bg-slate-950/50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th scope="col" className="px-6 py-4 font-medium">User</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Amount</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Method</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Details</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Date</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                  <th scope="col" className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    User
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Amount
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Method
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Details
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Date
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredWithdrawals.length > 0 ? (
                   filteredWithdrawals.map((withdrawal) => (
-                    <tr key={withdrawal.id} className="hover:bg-white/5 transition-colors">
+                    <tr
+                      key={withdrawal.id}
+                      className="hover:bg-white/5 transition-colors"
+                    >
                       <td className="whitespace-nowrap px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-400">
@@ -251,7 +275,9 @@ export default function AdminWithdrawalsPage() {
                             <p className="font-medium text-slate-200">
                               {withdrawal.userEmail}
                             </p>
-                            <p className="text-xs text-slate-500">ID: {withdrawal.id.slice(0, 8)}</p>
+                            <p className="text-xs text-slate-500">
+                              ID: {withdrawal.id.slice(0, 8)}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -263,47 +289,69 @@ export default function AdminWithdrawalsPage() {
                       </td>
                       <td className="px-6 py-4 max-w-xs truncate">
                         {withdrawal.method === "BANK" ? (
-                           <div className="flex items-center gap-1" title={`${withdrawal.details?.bankName} - ${withdrawal.details?.accountNumber}`}>
-                              <Landmark className="h-3 w-3 text-slate-500" />
-                              <span className="text-xs">{withdrawal.details?.bankName}</span>
-                           </div>
+                          <div
+                            className="flex items-center gap-1"
+                            title={`${withdrawal.details?.bankName} - ${withdrawal.details?.accountNumber}`}
+                          >
+                            <Landmark className="h-3 w-3 text-slate-500" />
+                            <span className="text-xs">
+                              {withdrawal.details?.bankName}
+                            </span>
+                          </div>
                         ) : (
-                           <div className="flex items-center gap-1" title={withdrawal.details?.walletAddress}>
-                              <Wallet className="h-3 w-3 text-slate-500" />
-                              <span className="text-xs truncate max-w-[120px]">{withdrawal.details?.walletAddress}</span>
-                           </div>
+                          <div
+                            className="flex items-center gap-1"
+                            title={withdrawal.details?.walletAddress}
+                          >
+                            <Wallet className="h-3 w-3 text-slate-500" />
+                            <span className="text-xs truncate max-w-[120px]">
+                              {withdrawal.details?.walletAddress}
+                            </span>
+                          </div>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4">
                         {formatDate(withdrawal.createdAt)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                          withdrawal.status === "approved"
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : withdrawal.status === "rejected"
-                            ? "bg-red-500/10 text-red-400"
-                            : "bg-amber-500/10 text-amber-400"
-                        }`}>
-                          {withdrawal.status === "pending" && <Clock className="h-3 w-3" />}
-                          {withdrawal.status === "approved" && <CheckCircle className="h-3 w-3" />}
-                          {withdrawal.status === "rejected" && <XCircle className="h-3 w-3" />}
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                            withdrawal.status === "approved"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : withdrawal.status === "rejected"
+                                ? "bg-red-500/10 text-red-400"
+                                : "bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {withdrawal.status === "pending" && (
+                            <Clock className="h-3 w-3" />
+                          )}
+                          {withdrawal.status === "approved" && (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          {withdrawal.status === "rejected" && (
+                            <XCircle className="h-3 w-3" />
+                          )}
                           {withdrawal.status}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
                         {withdrawal.status === "pending" && (
                           <div className="flex justify-end gap-2">
-                            <button 
-                              onClick={() => handleStatusUpdate(withdrawal, "approved")}
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(withdrawal, "approved")
+                              }
                               disabled={!!processingId}
                               className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400 transition hover:bg-emerald-500/20 disabled:opacity-50"
                               title="Approve Withdrawal"
                             >
                               <CheckCircle className="h-4 w-4" />
                             </button>
-                            <button 
-                              onClick={() => handleStatusUpdate(withdrawal, "rejected")}
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(withdrawal, "rejected")
+                              }
                               disabled={!!processingId}
                               className="rounded-lg bg-red-500/10 p-2 text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
                               title="Reject Withdrawal"
@@ -313,14 +361,19 @@ export default function AdminWithdrawalsPage() {
                           </div>
                         )}
                         {withdrawal.status !== "pending" && (
-                          <span className="text-xs text-slate-600">Processed</span>
+                          <span className="text-xs text-slate-600">
+                            Processed
+                          </span>
                         )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    <td
+                      colSpan={7}
+                      className="px-6 py-12 text-center text-slate-500"
+                    >
                       No withdrawals found.
                     </td>
                   </tr>

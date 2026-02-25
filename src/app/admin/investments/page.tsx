@@ -6,14 +6,13 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   getDocs,
-  getFirestore,
   query,
   orderBy,
   Timestamp,
   doc,
   getDoc,
 } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import AdminLayout from "@/components/admin-layout";
 import {
   TrendingUp,
@@ -46,7 +45,7 @@ export default function AdminInvestmentsPage() {
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -57,15 +56,15 @@ export default function AdminInvestmentsPage() {
       try {
         const investmentsQuery = query(
           collection(db, "investments"),
-          orderBy("startDate", "desc")
+          orderBy("startDate", "desc"),
         );
         const snapshot = await getDocs(investmentsQuery);
-        
+
         const investmentsData = await Promise.all(
           snapshot.docs.map(async (invDoc) => {
             const data = invDoc.data();
             let userEmail = "Unknown";
-            
+
             if (data.userId) {
               try {
                 const userDoc = await getDoc(doc(db, "users", data.userId));
@@ -82,7 +81,7 @@ export default function AdminInvestmentsPage() {
               ...data,
               userEmail,
             } as Investment;
-          })
+          }),
         );
 
         setInvestments(investmentsData);
@@ -96,7 +95,7 @@ export default function AdminInvestmentsPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const filteredInvestments = investments.filter(inv => {
+  const filteredInvestments = investments.filter((inv) => {
     if (filterStatus === "all") return true;
     return inv.status === filterStatus;
   });
@@ -122,7 +121,9 @@ export default function AdminInvestmentsPage() {
     return (
       <AdminLayout>
         <div className="flex h-full items-center justify-center">
-          <div className="animate-pulse text-slate-400">Loading investments...</div>
+          <div className="animate-pulse text-slate-400">
+            Loading investments...
+          </div>
         </div>
       </AdminLayout>
     );
@@ -138,7 +139,7 @@ export default function AdminInvestmentsPage() {
               Track all active and completed user investments.
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-500" />
             <select
@@ -158,19 +159,36 @@ export default function AdminInvestmentsPage() {
             <table className="w-full text-left text-sm text-slate-400">
               <thead className="bg-slate-950/50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th scope="col" className="px-6 py-4 font-medium">User</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Plan</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Invested</th>
-                  <th scope="col" className="px-6 py-4 font-medium">ROI</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Start Date</th>
-                  <th scope="col" className="px-6 py-4 font-medium">End Date</th>
-                  <th scope="col" className="px-6 py-4 font-medium">Status</th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    User
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Plan
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Invested
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    ROI
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Start Date
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    End Date
+                  </th>
+                  <th scope="col" className="px-6 py-4 font-medium">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredInvestments.length > 0 ? (
                   filteredInvestments.map((investment) => (
-                    <tr key={investment.id} className="hover:bg-white/5 transition-colors">
+                    <tr
+                      key={investment.id}
+                      className="hover:bg-white/5 transition-colors"
+                    >
                       <td className="whitespace-nowrap px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-400">
@@ -180,7 +198,9 @@ export default function AdminInvestmentsPage() {
                             <p className="font-medium text-slate-200">
                               {investment.userEmail}
                             </p>
-                            <p className="text-xs text-slate-500">ID: {investment.id.slice(0, 8)}</p>
+                            <p className="text-xs text-slate-500">
+                              ID: {investment.id.slice(0, 8)}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -200,13 +220,19 @@ export default function AdminInvestmentsPage() {
                         {formatDate(investment.endDate)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                          investment.status === "active"
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-slate-700/50 text-slate-400"
-                        }`}>
-                          {investment.status === "active" && <Clock className="h-3 w-3" />}
-                          {investment.status === "completed" && <CheckCircle className="h-3 w-3" />}
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                            investment.status === "active"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : "bg-slate-700/50 text-slate-400"
+                          }`}
+                        >
+                          {investment.status === "active" && (
+                            <Clock className="h-3 w-3" />
+                          )}
+                          {investment.status === "completed" && (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
                           {investment.status}
                         </span>
                       </td>
@@ -214,7 +240,10 @@ export default function AdminInvestmentsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    <td
+                      colSpan={7}
+                      className="px-6 py-12 text-center text-slate-500"
+                    >
                       No investments found.
                     </td>
                   </tr>

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, getFirestore, Timestamp } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { doc, getDoc, Timestamp, onSnapshot } from "firebase/firestore";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -39,6 +39,7 @@ type UserProfile = {
   totalWithdrawals?: number;
   pendingWithdrawals?: number;
   lastWithdrawal?: number;
+  photoURL?: string;
 };
 
 const dashboardNavItems = [
@@ -104,27 +105,40 @@ export default function DashboardLayout({
   useEffect(() => {
     const app = getFirebaseApp();
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getFirebaseFirestore();
+    let unsubscribeSnapshot: (() => void) | undefined;
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         router.replace("/login");
         return;
       }
 
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      if (userDoc.exists()) {
-        setProfile(userDoc.data() as UserProfile);
-      } else {
-        setProfile({
-          email: currentUser.email ?? "",
-          joinedDate: new Date(), // Fallback
-        });
+      // Clean up previous snapshot listener if user changes (rare but good practice)
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
       }
-      setCheckingAuth(false);
+
+      const userRef = doc(db, "users", currentUser.uid);
+      unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setProfile(docSnap.data() as UserProfile);
+        } else {
+          setProfile({
+            email: currentUser.email ?? "",
+            joinedDate: new Date(),
+          });
+        }
+        setCheckingAuth(false);
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, [router]);
 
   const handleLogoutClick = () => {
@@ -158,8 +172,16 @@ export default function DashboardLayout({
       {/* Sidebar - Desktop */}
       <aside className="hidden w-64 flex-col border-r border-white/5 bg-slate-950 px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800">
-            <User className="h-6 w-6 text-slate-400" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-800">
+            {profile?.photoURL ? (
+              <img
+                src={profile.photoURL}
+                alt={username}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <User className="h-6 w-6 text-slate-400" />
+            )}
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-200">
@@ -225,8 +247,16 @@ export default function DashboardLayout({
               </button>
             </div>
             <div className="mb-8 flex items-center gap-3 px-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800">
-                <User className="h-6 w-6 text-slate-400" />
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-800">
+                {profile?.photoURL ? (
+                  <img
+                    src={profile.photoURL}
+                    alt={username}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User className="h-6 w-6 text-slate-400" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-200">
@@ -294,8 +324,16 @@ export default function DashboardLayout({
               About Us
             </Link>
             <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 hover:bg-slate-800">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-300">
-                <User className="h-5 w-5" />
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-slate-700 text-slate-300">
+                {profile?.photoURL ? (
+                  <img
+                    src={profile.photoURL}
+                    alt={username}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User className="h-5 w-5" />
+                )}
               </div>
               <ChevronDown className="h-4 w-4 text-slate-500" />
             </div>

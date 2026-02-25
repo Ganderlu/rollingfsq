@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
-import { getFirebaseApp } from "@/lib/firebaseClient";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { getFirebaseApp, getFirebaseFirestore } from "@/lib/firebaseClient";
 
-export default function RegisterPage() {
+function RegisterForm() {
+  const searchParams = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -15,6 +17,14 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [referredBy, setReferredBy] = useState<string | null>(null);
+
+  useEffect(() => {
+    const refCode = searchParams.get("ref");
+    if (refCode) {
+      setReferredBy(refCode);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,7 +44,7 @@ export default function RegisterPage() {
     try {
       const app = getFirebaseApp();
       const auth = getAuth(app);
-      const db = getFirestore(app);
+      const db = getFirebaseFirestore();
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -48,6 +58,11 @@ export default function RegisterPage() {
         email,
         investmentGoal: goal,
         createdAt: serverTimestamp(),
+        referredBy: referredBy || null,
+        activeDeposits: 0,
+        totalInvested: 0,
+        referralEarnings: 0,
+        balance: 0,
       });
 
       setSuccess("Account created successfully. You can now log in.");
@@ -80,7 +95,8 @@ export default function RegisterPage() {
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-slate-200 sm:text-base">
               Create a secure account, tell us about your time horizon and risk
-              tolerance, and we will recommend a portfolio tailored to your goals.
+              tolerance, and we will recommend a portfolio tailored to your
+              goals.
             </p>
             <ul className="mt-4 space-y-2 text-sm text-slate-100">
               <li>Digital onboarding with secure identity verification.</li>
@@ -199,7 +215,9 @@ export default function RegisterPage() {
                 <p className="text-xs font-medium text-red-400">{error}</p>
               ) : null}
               {success ? (
-                <p className="text-xs font-medium text-emerald-300">{success}</p>
+                <p className="text-xs font-medium text-emerald-300">
+                  {success}
+                </p>
               ) : null}
               <button
                 type="submit"
@@ -211,12 +229,20 @@ export default function RegisterPage() {
             </form>
             <p className="mt-3 text-[11px] text-slate-400">
               This page is a visual prototype. In a production environment, this
-              form would submit through a secure onboarding workflow and identity
-              verification process.
+              form would submit through a secure onboarding workflow and
+              identity verification process.
             </p>
           </div>
         </section>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
