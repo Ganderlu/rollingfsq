@@ -131,7 +131,7 @@ export default function AccountSettingsPage() {
       const app = getFirebaseApp();
       const storage = getFirebaseStorage();
       const auth = getAuth(app);
-      const db = getFirestore(app);
+      const db = getFirebaseFirestore();
 
       if (!auth.currentUser) return;
 
